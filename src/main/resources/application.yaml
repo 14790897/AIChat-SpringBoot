@@ -1,0 +1,23 @@
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: aichat
+  ai:
+    openai:
+      api-key: sk-2ELpz95qmZQqnf01QCZuxxD6ZqVAdqJlpJuscl5Q9YGCcjLk
+      base-url: https://new.14790897.xyz/v1
+      chat:
+        options:
+          model: gpt-4.1
+          temperature: 0.7
+
+logging:
+  level:
+    com.openai: DEBUG
+    org.springframework.ai: DEBUG
