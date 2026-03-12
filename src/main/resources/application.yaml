@@ -10,14 +10,19 @@ spring:
     name: aichat
   ai:
     openai:
-      api-key: sk-2ELpz95qmZQqnf01QCZuxxD6ZqVAdqJlpJuscl5Q9YGCcjLk
-      base-url: https://new.14790897.xyz/v1
+      api-key: sk-3bc298da74e541d198403364325f040a
+      base-url: http://192.168.0.82:8045/v1
       chat:
         options:
-          model: gpt-4.1
+          model: claude-sonnet-4-6
           temperature: 0.7
 
 logging:
   level:
-    com.openai: DEBUG
-    org.springframework.ai: DEBUG
+    com.liuweiqing.aichat: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,beans,metrics,mappings"
