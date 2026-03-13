@@ -16,6 +16,17 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
+/**
+ * Spring Security 配置。
+ * 关键设计决策：
+ * 1. STATELESS 会话 + JWT 认证（无服务端 session）
+ * 2. ASYNC/ERROR/FORWARD dispatch 类型 permitAll —— 解决 SseEmitter 完成时
+ *    async dispatch 通过安全过滤链导致 Access Denied 的问题（此时 response 已提交，JWT 上下文丢失）
+ * 3. accessDeniedHandler 检查 response.isCommitted() —— 避免对已提交的响应重复写入导致异常
+ * 4. NullRequestCache —— 无状态 API 不需要缓存请求
+ * 5. jwtAuthenticationFilterRegistration(enabled=false) —— 防止 JwtAuthenticationFilter 被
+ *    Servlet 容器作为普通 Filter 重复注册（它只应通过 Security filter chain 执行一次）
+ */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

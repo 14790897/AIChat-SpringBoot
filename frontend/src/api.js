@@ -73,6 +73,12 @@ export async function register(username, password) {
   return data
 }
 
+/**
+ * SSE 流式聊天请求。
+ * 使用 ReadableStream 手动解析 SSE，而非 EventSource（因为需要 POST + 自定义 Header）。
+ * 关键：用 buffer 缓存不完整的行，防止 TCP 分包导致 data: 行被截断而丢字。
+ * lines.pop() 将最后一个可能不完整的行留在 buffer，等下一个 chunk 拼接后再处理。
+ */
 export async function chatStream(message, onChunk, onDone, conversationId) {
   const res = await authFetch('/api/chat/stream', {
     method: 'POST',

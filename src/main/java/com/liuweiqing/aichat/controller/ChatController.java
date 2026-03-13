@@ -22,6 +22,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 聊天控制器，处理所有 /api/chat/** 请求。
+ * 注意：使用 SseEmitter（servlet 原生 SSE）而非 Flux<ServerSentEvent>，
+ * 因为在 servlet-based Spring MVC + Spring Security 环境下，Flux 完成时会触发
+ * async dispatch 通过安全过滤链，而此时 response 已提交、JWT 上下文丢失，导致 Access Denied。
+ * SseEmitter 配合 SecurityConfig 中 dispatcherTypeMatchers(ASYNC).permitAll() 解决此问题。
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/chat")
@@ -66,13 +73,15 @@ public class ChatController {
         return messages;
     }
 
+    // upsert 逻辑：数据库中有则更新，无则新建
     private void saveHistory(String username, String conversationId, List<Map<String, String>> history) {
         try {
             String json = objectMapper.writeValueAsString(history);
+            // Optional.orElse: 查到已有对话就用它，查不到就 new 一个新的
             Conversation conv = conversationRepository.findByUsernameAndConversationId(username, conversationId)
                     .orElse(new Conversation(username, conversationId, json));
             conv.setMessagesJson(json);
-            conversationRepository.save(conv);
+            conversationRepository.save(conv); // save() 继承自 JpaRepository，无需在 Repository 中定义
         } catch (Exception e) {
             log.error("Failed to save conversation: {}", e.getMessage());
         }
@@ -106,6 +115,11 @@ public class ChatController {
         return content;
     }
 
+    /**
+     * SSE 流式聊天接口。
+     * 使用 SseEmitter 而非 Flux<ServerSentEvent>，避免 async dispatch 触发 Spring Security Access Denied。
+     * WebClient 仍以响应式方式调用 OpenAI API，通过 subscribe() 将数据推送到 SseEmitter。
+     */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(@RequestBody ChatRequest request, Authentication authentication) {
         String username = authentication.getName();
