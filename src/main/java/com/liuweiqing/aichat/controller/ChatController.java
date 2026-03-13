@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -165,6 +167,49 @@ public class ChatController {
         conversationRepository.deleteByUsernameAndConversationId(username, convId);
         log.info("User [{}] cleared conversation: {}", username, convId);
         return "Conversation cleared";
+    }
+
+    @GetMapping("/conversations")
+    public List<Map<String, String>> listConversations(Authentication authentication) {
+        String username = authentication.getName();
+        return conversationRepository.findByUsernameOrderByIdDesc(username).stream()
+                .map(conv -> {
+                    String title = conv.getConversationId();
+                    try {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, String>> msgs = (List<Map<String, String>>) objectMapper.readValue(
+                                conv.getMessagesJson(), List.class);
+                        for (Map<String, String> msg : msgs) {
+                            if ("user".equals(msg.get("role"))) {
+                                String content = msg.get("content");
+                                title = content.length() > 30 ? content.substring(0, 30) + "..." : content;
+                                break;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                    return Map.of("conversationId", conv.getConversationId(), "title", title);
+                })
+                .toList();
+    }
+
+    @GetMapping("/conversation")
+    public List<Map<String, String>> getConversation(
+            @RequestParam String conversationId, Authentication authentication) {
+        String username = authentication.getName();
+        return conversationRepository.findByUsernameAndConversationId(username, conversationId)
+                .map(conv -> {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        List<Map<String, String>> msgs = (List<Map<String, String>>) objectMapper.readValue(
+                                conv.getMessagesJson(), List.class);
+                        return msgs.stream()
+                                .filter(m -> !"system".equals(m.get("role")))
+                                .toList();
+                    } catch (Exception e) {
+                        return List.<Map<String, String>>of();
+                    }
+                })
+                .orElse(List.of());
     }
 
     public record ChatRequest(String message, String conversationId) {}

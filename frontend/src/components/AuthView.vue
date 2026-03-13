@@ -1,25 +1,35 @@
 <template>
   <div class="auth-container">
-    <div class="auth-card">
-      <h2>AI Chat</h2>
-      <div class="auth-tabs">
-        <button :class="['auth-tab', tab === 'login' && 'active']" @click="tab = 'login'">登录</button>
-        <button :class="['auth-tab', tab === 'register' && 'active']" @click="tab = 'register'">注册</button>
-      </div>
-      <form @submit.prevent="handleSubmit">
-        <input class="auth-input" v-model="username" type="text" placeholder="用户名" required>
-        <input class="auth-input" v-model="password" type="password" placeholder="密码" required>
-        <button class="auth-submit" type="submit" :disabled="loading">
-          {{ loading ? '处理中...' : (tab === 'login' ? '登录' : '注册') }}
-        </button>
-      </form>
-      <div v-if="error" class="auth-error">{{ error }}</div>
-    </div>
+    <el-card class="auth-card" shadow="always">
+      <template #header>
+        <h2 class="auth-title">AI Chat</h2>
+      </template>
+      <el-tabs v-model="tab" stretch>
+        <el-tab-pane label="登录" name="login" />
+        <el-tab-pane label="注册" name="register" />
+      </el-tabs>
+      <el-form @submit.prevent="handleSubmit">
+        <el-form-item>
+          <el-input v-model="username" placeholder="用户名" :prefix-icon="User" size="large" />
+        </el-form-item>
+        <el-form-item>
+          <el-input v-model="password" type="password" placeholder="密码" :prefix-icon="Lock"
+            size="large" show-password />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" native-type="submit" :loading="loading" size="large" style="width: 100%">
+            {{ tab === 'login' ? '登录' : '注册' }}
+          </el-button>
+        </el-form-item>
+      </el-form>
+      <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
+    </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { User, Lock } from '@element-plus/icons-vue'
 import { login, register, getToken } from '../api.js'
 
 const emit = defineEmits(['login'])
@@ -56,53 +66,11 @@ async function handleSubmit() {
   align-items: center;
 }
 .auth-card {
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  width: 360px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  width: 400px;
 }
-.auth-card h2 { text-align: center; margin-bottom: 24px; color: #075e54; }
-.auth-tabs {
-  display: flex;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #eee;
-}
-.auth-tab {
-  flex: 1;
-  padding: 10px;
+.auth-title {
   text-align: center;
-  cursor: pointer;
-  border: none;
-  background: none;
-  font-size: 15px;
-  color: #999;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
+  color: var(--el-color-primary);
+  margin: 0;
 }
-.auth-tab.active { color: #075e54; border-bottom-color: #075e54; font-weight: 600; }
-.auth-input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 15px;
-  outline: none;
-  margin-bottom: 12px;
-}
-.auth-input:focus { border-color: #075e54; }
-.auth-submit {
-  width: 100%;
-  padding: 12px;
-  background: #075e54;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 15px;
-  cursor: pointer;
-  margin-top: 4px;
-}
-.auth-submit:hover { background: #064e46; }
-.auth-submit:disabled { background: #a0a0a0; cursor: not-allowed; }
-.auth-error { color: #e74c3c; font-size: 13px; margin-top: 8px; text-align: center; }
 </style>

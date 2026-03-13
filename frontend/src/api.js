@@ -73,10 +73,10 @@ export async function register(username, password) {
   return data
 }
 
-export async function chatStream(message, onChunk, onDone) {
+export async function chatStream(message, onChunk, onDone, conversationId) {
   const res = await authFetch('/api/chat/stream', {
     method: 'POST',
-    body: JSON.stringify({ message })
+    body: JSON.stringify({ message, conversationId })
   })
   if (!res.ok) {
     throw new Error('请求失败: ' + res.status)
@@ -105,4 +105,25 @@ export async function chatStream(message, onChunk, onDone) {
     onChunk(fullText)
   }
   if (onDone) onDone(fullText)
+}
+
+export async function listConversations() {
+  const res = await authFetch('/api/chat/conversations')
+  if (!res.ok) throw new Error('获取对话列表失败')
+  return res.json()
+}
+
+export async function getConversation(conversationId) {
+  const res = await authFetch('/api/chat/conversation?conversationId=' + encodeURIComponent(conversationId))
+  if (!res.ok) throw new Error('获取对话失败')
+  return res.json()
+}
+
+export async function deleteConversation(conversationId) {
+  const res = await authFetch('/api/chat/clear', {
+    method: 'POST',
+    body: JSON.stringify({ conversationId })
+  })
+  if (!res.ok) throw new Error('删除对话失败')
+  return res.text()
 }
