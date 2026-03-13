@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+## static generated files
+src\main\resources\static
