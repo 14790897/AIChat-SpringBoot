@@ -37,7 +37,7 @@ out/
 .vscode/
 
 ## static generated files
-src\main\resources\static
+src/main/resources/static
 
 ## environment variables
 .env
