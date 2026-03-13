@@ -5,7 +5,7 @@
       <span class="header-title">AI Chat</span>
       <div class="header-right">
         <el-text type="info">{{ username }}</el-text>
-        <el-button size="small" @click="$emit('logout')">退出</el-button>
+        <el-button type="info" size="small" @click="$emit('logout')">退出</el-button>
       </div>
     </el-header>
 
