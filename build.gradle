@@ -30,7 +30,12 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'org.springframework.boot:spring-boot-starter-json'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'com.auth0:java-jwt:4.4.0'
+	implementation 'me.paulschwarz:spring-dotenv:5.1.0'
+	runtimeOnly 'org.postgresql:postgresql'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
@@ -39,6 +44,30 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// 前端构建任务
+def npmCmd = org.gradle.internal.os.OperatingSystem.current().isWindows() ? 'npm.cmd' : 'npm'
+
+tasks.register('npmInstall', Exec) {
+	workingDir 'frontend'
+	commandLine npmCmd, 'install'
+	inputs.file('frontend/package.json')
+	outputs.dir('frontend/node_modules')
+}
+
+tasks.register('buildFrontend', Exec) {
+	dependsOn 'npmInstall'
+	workingDir 'frontend'
+	commandLine npmCmd, 'run', 'build'
+	inputs.dir('frontend/src')
+	inputs.file('frontend/index.html')
+	inputs.file('frontend/vite.config.js')
+	outputs.dir('src/main/resources/static')
+}
+
+tasks.named('processResources') {
+	dependsOn 'buildFrontend'
 }
 
 tasks.withType(JavaExec).configureEach {

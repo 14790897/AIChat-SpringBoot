@@ -1,22 +1,24 @@
 package com.liuweiqing.aichat.controller;
 
+import com.liuweiqing.aichat.model.Conversation;
+import com.liuweiqing.aichat.repository.ConversationRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @RestController
@@ -26,13 +28,15 @@ public class ChatController {
     private final WebClient webClient;
     private final String model;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ConcurrentHashMap<String, List<Map<String, String>>> conversations = new ConcurrentHashMap<>();
+    private final ConversationRepository conversationRepository;
 
     public ChatController(
             @Value("${spring.ai.openai.base-url}") String baseUrl,
             @Value("${spring.ai.openai.api-key}") String apiKey,
-            @Value("${spring.ai.openai.chat.options.model}") String model) {
+            @Value("${spring.ai.openai.chat.options.model}") String model,
+            ConversationRepository conversationRepository) {
         this.model = model;
+        this.conversationRepository = conversationRepository;
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
@@ -40,20 +44,45 @@ public class ChatController {
                 .build();
     }
 
-    private List<Map<String, String>> getHistory(String conversationId) {
-        return conversations.computeIfAbsent(conversationId, k -> {
-            List<Map<String, String>> messages = new ArrayList<>();
-            messages.add(Map.of("role", "system", "content", "You are a helpful AI assistant."));
-            return messages;
-        });
+    @SuppressWarnings("unchecked")
+    private List<Map<String, String>> loadHistory(String username, String conversationId) {
+        return conversationRepository.findByUsernameAndConversationId(username, conversationId)
+                .map(conv -> {
+                    try {
+                        return (List<Map<String, String>>) objectMapper.readValue(
+                                conv.getMessagesJson(), List.class);
+                    } catch (Exception e) {
+                        return newHistory();
+                    }
+                })
+                .orElseGet(this::newHistory);
+    }
+
+    private List<Map<String, String>> newHistory() {
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", "You are a helpful AI assistant."));
+        return messages;
+    }
+
+    private void saveHistory(String username, String conversationId, List<Map<String, String>> history) {
+        try {
+            String json = objectMapper.writeValueAsString(history);
+            Conversation conv = conversationRepository.findByUsernameAndConversationId(username, conversationId)
+                    .orElse(new Conversation(username, conversationId, json));
+            conv.setMessagesJson(json);
+            conversationRepository.save(conv);
+        } catch (Exception e) {
+            log.error("Failed to save conversation: {}", e.getMessage());
+        }
     }
 
     @PostMapping("/send")
-    public String chat(@RequestBody ChatRequest request) {
-        log.info("Received chat request: {}", request.message());
+    public String chat(@RequestBody ChatRequest request, Authentication authentication) {
+        String username = authentication.getName();
+        log.info("User [{}] chat request: {}", username, request.message());
 
         String convId = request.conversationId() != null ? request.conversationId() : "default";
-        List<Map<String, String>> history = getHistory(convId);
+        List<Map<String, String>> history = loadHistory(username, convId);
         history.add(Map.of("role", "user", "content", request.message()));
 
         Map<String, Object> body = Map.of(
@@ -68,18 +97,20 @@ public class ChatController {
                 .block();
 
         String content = response.at("/choices/0/message/content").asString();
-        log.info("Chat response: {}", content);
+        log.info("User [{}] chat response: {}", username, content);
 
         history.add(Map.of("role", "assistant", "content", content));
+        saveHistory(username, convId, history);
         return content;
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> chatStream(@RequestBody ChatRequest request) {
-        log.info("Received stream chat request: {}", request.message());
+    public SseEmitter chatStream(@RequestBody ChatRequest request, Authentication authentication) {
+        String username = authentication.getName();
+        log.info("User [{}] stream chat request: {}", username, request.message());
 
         String convId = request.conversationId() != null ? request.conversationId() : "default";
-        List<Map<String, String>> history = getHistory(convId);
+        List<Map<String, String>> history = loadHistory(username, convId);
         history.add(Map.of("role", "user", "content", request.message()));
 
         Map<String, Object> body = Map.of(
@@ -87,42 +118,52 @@ public class ChatController {
                 "stream", true,
                 "messages", history);
 
+        SseEmitter emitter = new SseEmitter(180_000L);
         StringBuilder fullResponse = new StringBuilder();
 
-        return webClient.post()
+        webClient.post()
                 .uri("/chat/completions")
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
                 .filter(chunk -> !"[DONE]".equals(chunk.trim()))
-                .<ServerSentEvent<String>>mapNotNull(chunk -> {
-                    try {
-                        JsonNode node = objectMapper.readTree(chunk);
-                        JsonNode content = node.at("/choices/0/delta/content");
-                        if (content.isMissingNode() || content.isNull())
-                            return null;
-                        String text = content.asString();
-                        fullResponse.append(text);
-                        return ServerSentEvent.<String>builder()
-                                .data(text)
-                                .build();
-                    } catch (Exception e) {
-                        return null;
-                    }
-                })
-                .doOnComplete(() -> {
-                    log.info("Stream response: {}", fullResponse);
-                    history.add(Map.of("role", "assistant", "content", fullResponse.toString()));
-                })
-                .doOnError(e -> log.error("Stream response error: {}", e.getMessage()));
+                .subscribe(
+                        chunk -> {
+                            try {
+                                JsonNode node = objectMapper.readTree(chunk);
+                                JsonNode content = node.at("/choices/0/delta/content");
+                                if (content.isMissingNode() || content.isNull())
+                                    return;
+                                String text = content.asString();
+                                fullResponse.append(text);
+                                emitter.send(SseEmitter.event().data(text));
+                            } catch (Exception e) {
+                                // skip unparseable chunks
+                            }
+                        },
+                        error -> {
+                            log.error("Stream response error: {}", error.getMessage());
+                            emitter.completeWithError(error);
+                        },
+                        () -> {
+                            log.info("User [{}] stream response: {}", username, fullResponse);
+                            history.add(Map.of("role", "assistant", "content", fullResponse.toString()));
+                            saveHistory(username, convId, history);
+                            emitter.complete();
+                        }
+                );
+
+        return emitter;
     }
 
     @PostMapping("/clear")
-    public String clearHistory(@RequestBody(required = false) ClearRequest request) {
+    @Transactional
+    public String clearHistory(@RequestBody(required = false) ClearRequest request, Authentication authentication) {
+        String username = authentication.getName();
         String convId = request != null && request.conversationId() != null ? request.conversationId() : "default";
-        conversations.remove(convId);
-        log.info("Cleared conversation: {}", convId);
+        conversationRepository.deleteByUsernameAndConversationId(username, convId);
+        log.info("User [{}] cleared conversation: {}", username, convId);
         return "Conversation cleared";
     }
 

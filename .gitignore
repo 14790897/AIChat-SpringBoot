@@ -38,3 +38,6 @@ out/
 
 ## static generated files
 src\main\resources\static
+
+## environment variables
+.env
