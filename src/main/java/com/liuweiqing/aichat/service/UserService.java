@@ -42,4 +42,11 @@ public class UserService {
         }
         return jwtUtil.generateToken(username);
     }
+
+    /**
+     * 登出，从 Redis 中删除 token 使其失效。
+     */
+    public void logout(String token) {
+        jwtUtil.removeToken(token);
+    }
 }
