@@ -3,7 +3,6 @@ package com.liuweiqing.aichat.controller;
 import com.liuweiqing.aichat.dto.AuthResponse;
 import com.liuweiqing.aichat.dto.LoginRequest;
 import com.liuweiqing.aichat.dto.RegisterRequest;
-import com.liuweiqing.aichat.security.JwtUtil;
 import com.liuweiqing.aichat.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -19,11 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final UserService userService;
-    private final JwtUtil jwtUtil;
 
-    public AuthController(UserService userService, JwtUtil jwtUtil) {
+    public AuthController(UserService userService) {
         this.userService = userService;
-        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/register")
@@ -33,8 +30,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Username and password are required");
         }
         try {
-            userService.register(request.username(), request.password());
-            String token = jwtUtil.generateToken(request.username());
+            String token = userService.register(request.username(), request.password());
             log.info("User registered: {}", request.username());
             return ResponseEntity.ok(new AuthResponse(token, request.username()));
         } catch (IllegalArgumentException e) {
@@ -45,8 +41,7 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         try {
-            userService.authenticate(request.username(), request.password());
-            String token = jwtUtil.generateToken(request.username());
+            String token = userService.authenticate(request.username(), request.password());
             log.info("User logged in: {}", request.username());
             return ResponseEntity.ok(new AuthResponse(token, request.username()));
         } catch (IllegalArgumentException e) {
