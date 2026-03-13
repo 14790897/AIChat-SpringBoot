@@ -26,7 +26,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - run: ./gradlew test
+      - run: chmod +x ./gradlew && ./gradlew test
 
   docker:
     needs: test
