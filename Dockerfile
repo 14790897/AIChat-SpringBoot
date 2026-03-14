@@ -1,11 +1,15 @@
+FROM node:22-slim AS frontend
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
-RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
 COPY . .
-RUN chmod +x ./gradlew && ./gradlew bootJar -x test --no-daemon
+COPY --from=frontend /app/src/main/resources/static src/main/resources/static
+RUN chmod +x ./gradlew && ./gradlew bootJar -x test -x buildFrontend -x npmInstall --no-daemon
 
 FROM eclipse-temurin:25-jre
 WORKDIR /app
