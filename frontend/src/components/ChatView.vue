@@ -15,6 +15,11 @@
           新对话
         </el-button>
         <el-scrollbar>
+          <div v-if="loadingConversations" class="conv-loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <el-text type="info" size="small">加载中...</el-text>
+          </div>
+          <template v-else>
           <div
             v-for="conv in conversations"
             :key="conv.conversationId"
@@ -27,6 +32,7 @@
               @click.stop="removeConversation(conv.conversationId)" />
           </div>
           <el-empty v-if="conversations.length === 0" description="暂无历史对话" :image-size="60" />
+          </template>
         </el-scrollbar>
       </div>
     </el-drawer>
@@ -37,6 +43,11 @@
           新对话
         </el-button>
         <el-scrollbar>
+          <div v-if="loadingConversations" class="conv-loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <el-text type="info" size="small">加载中...</el-text>
+          </div>
+          <template v-else>
           <div
             v-for="conv in conversations"
             :key="conv.conversationId"
@@ -49,12 +60,18 @@
               @click.stop="removeConversation(conv.conversationId)" />
           </div>
           <el-empty v-if="conversations.length === 0" description="暂无历史对话" :image-size="60" />
+          </template>
         </el-scrollbar>
       </el-aside>
 
       <el-main class="chat-main">
         <el-scrollbar ref="scrollbarRef" class="chat-scrollbar">
           <div class="chat-container" ref="chatContainer">
+            <div v-if="loadingChat" class="chat-loading">
+              <el-icon class="is-loading" :size="24"><Loading /></el-icon>
+              <el-text type="info">加载对话中...</el-text>
+            </div>
+            <template v-else>
             <div v-for="(msg, i) in messages" :key="i" :class="['message', msg.role]">
               <div v-if="msg.role === 'assistant'" class="md-content" v-html="renderMd(msg.content)"></div>
               <template v-else>{{ msg.content }}</template>
@@ -62,6 +79,7 @@
             <div v-if="thinking" class="message assistant">
               <el-text type="info" size="small"><el-icon class="is-loading"><Loading /></el-icon> 思考中...</el-text>
             </div>
+            </template>
           </div>
         </el-scrollbar>
 
@@ -109,6 +127,8 @@ const inputRef = ref(null)
 const drawerVisible = ref(false)
 const conversations = ref([])
 const currentConvId = ref(null)
+const loadingConversations = ref(false)
+const loadingChat = ref(false)
 
 function generateConvId() {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 6)
@@ -123,10 +143,13 @@ function scrollToBottom() {
 }
 
 async function refreshConversations() {
+  loadingConversations.value = true
   try {
     conversations.value = await listConversations()
   } catch (e) {
     // ignore
+  } finally {
+    loadingConversations.value = false
   }
 }
 
@@ -138,6 +161,7 @@ function newChat() {
 }
 
 async function loadConversation(convId) {
+  loadingChat.value = true
   try {
     const msgs = await getConversation(convId)
     messages.value = msgs
@@ -146,6 +170,8 @@ async function loadConversation(convId) {
     scrollToBottom()
   } catch (e) {
     messages.value = [{ role: 'assistant', content: '加载对话失败: ' + e.message }]
+  } finally {
+    loadingChat.value = false
   }
 }
 
@@ -349,5 +375,22 @@ onMounted(() => {
   gap: 10px;
   align-items: flex-end;
   border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.conv-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 0;
+}
+
+.chat-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 0;
 }
 </style>
