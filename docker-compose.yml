@@ -16,7 +16,7 @@ services:
       - "6379:6379"
 
   app:
-    build: .
+    image: 14790897/aichat-spring:latest
     ports:
       - "8080:8080"
     depends_on:
