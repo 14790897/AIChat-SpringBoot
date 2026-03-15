@@ -89,7 +89,7 @@ cd frontend && npm install && npm run dev   # 前端开发模式（localhost:517
 ./gradlew bootRun                            # 后端（localhost:8080）
 ```
 
-### Docker 启动
+### Docker 启动(需要先设置置 .env 文件)
 
 ```bash
 # 1. 复制环境变量模板并填写 AI API 配置和 JWT Secret
