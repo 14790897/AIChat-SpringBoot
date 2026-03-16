@@ -162,3 +162,8 @@ aichat-spring/
 | GET  | `/api/chat/conversations` | 获取会话列表 | 是 |
 | GET  | `/api/chat/conversation?conversationId=xxx` | 获取会话详情 | 是 |
 | POST | `/api/chat/clear` | 删除会话 | 是 |
+
+
+## vscode 热重载设置开启方法，需spring boot dashboard debug模式启动，文件需要开启自动保存
+![alt text](image.png)
+![alt text](image-1.png)
