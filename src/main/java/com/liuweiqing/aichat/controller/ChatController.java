@@ -124,8 +124,8 @@ public class ChatController {
     public SseEmitter chatStream(@RequestBody ChatRequest request, Authentication authentication) {
         String username = authentication.getName();
         log.info("User [{}] stream chat request: {}", username, request.message());
-
         String convId = request.conversationId() != null ? request.conversationId() : "default";
+        log.info("Conversation ID: {}", convId);
         List<Map<String, String>> history = loadHistory(username, convId);
         history.add(Map.of("role", "user", "content", request.message()));
 
